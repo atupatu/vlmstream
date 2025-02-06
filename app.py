@@ -170,7 +170,7 @@ def main():
         with col2:
             # Display the uploaded image
             image = Image.open(uploaded_file)
-            st.image(image, caption="Uploaded Technical Drawing", use_container_width=True)
+            st.image(image, caption="Uploaded Technical Drawing")
 
 if __name__ == "__main__":
     main()
