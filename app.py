@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 
+
 # Check and install mistralai if not installed
 try:
     from mistralai import Mistral
@@ -15,6 +16,8 @@ except ImportError:
     from mistralai import Mistral  # Import again after installation
 
 from dotenv import load_dotenv
+
+load_dotenv()
 
 def encode_image_to_base64(image_bytes):
     return "data:image/jpeg;base64," + base64.b64encode(image_bytes).decode("utf-8")
@@ -33,7 +36,7 @@ def parse_ai_response(response_text):
     return results
 
 def analyze_cylinder_image(image_bytes):
-    api_key = 'jIn2ixaaZlL4FQHnyFAmcD3QRVttbBOQ'
+    api_key = os.getenv("MISTRAL_API_KEY")
     model = "pixtral-12b-2409"
     client = Mistral(api_key=api_key)
     base64_image = encode_image_to_base64(image_bytes)
@@ -45,7 +48,7 @@ def analyze_cylinder_image(image_bytes):
                 {
                     "type": "text",
                     "text": (
-                        "Analyze the engineering drawing and provide the following information in exactly this format, only extract these fields from the upload image rest keep empty in the table:\n"
+                        "Analyze the engineering drawing and provide the following information with these strict rules 1)in exactly this format, 2)only extract these fields from the upload image rest keep empty in the table:3)if the metrics dont match ,convert them into the desired metrics\n"
                         "CYLINDER ACTION: [value]\n"
                         "BORE DIAMETER: [value] MM\n"
                         "OUTSIDE DIAMETER: [value] MM\n"
