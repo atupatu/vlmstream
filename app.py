@@ -48,7 +48,7 @@ def analyze_cylinder_image(image_bytes):
                 {
                     "type": "text",
                     "text": (
-                        "Analyze the engineering drawing and provide the following information with these strict rules 1)in exactly this format, 2)only extract these fields from the upload image rest keep empty in the table:3)if the metrics dont match ,convert them into the desired metrics\n"
+                        "Analyze the engineering drawing and provide the following information with these strict rules 1)in exactly this format, 2)only extract these fields from the upload image rest keep empty in the table(if empty then return NA):3)if the metrics dont match ,convert them into the desired metrics 4)Try your best to get all the values ,as this is a steel pipe image\n"
                         "CYLINDER ACTION: [value]\n"
                         "BORE DIAMETER: [value] MM\n"
                         "OUTSIDE DIAMETER: [value] MM\n"
