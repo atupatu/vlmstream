@@ -3,8 +3,17 @@ import base64
 from PIL import Image
 import io
 import pandas as pd
-from mistralai import Mistral
 import os
+import subprocess
+import sys
+
+# Check and install mistralai if not installed
+try:
+    from mistralai import Mistral
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "mistralai"])
+    from mistralai import Mistral  # Import again after installation
+
 from dotenv import load_dotenv
 
 def encode_image_to_base64(image_bytes):
@@ -36,7 +45,7 @@ def analyze_cylinder_image(image_bytes):
                 {
                     "type": "text",
                     "text": (
-                        "Analyze the engineering drawing and provide the following information in exactly this format, only extract these fields from the upload image rest keep empty in the table:\n"
+                        "Analyze the engineering drawing and provide the following information in exactly this format, only extract these fields from the upload image rest keep empty in the table:\n"
                         "CYLINDER ACTION: [value]\n"
                         "BORE DIAMETER: [value] MM\n"
                         "OUTSIDE DIAMETER: [value] MM\n"
