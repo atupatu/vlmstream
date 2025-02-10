@@ -16,7 +16,6 @@ if not API_KEY:
     st.error("❌ API key not found! Check your .env file.")
     st.stop()  # Stops execution if no API key is found.
 
-
 # OpenRouter API URL for Qwen2.5-VL-72B-Instruct
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -51,22 +50,23 @@ def analyze_cylinder_image(image_bytes):
                         "text": (
                             "Analyze the engineering drawing and extract only the values that are clearly visible in the image.\n"
                             "STRICT RULES:\n"
-                            "1) If a value is missing or unclear, return 'N/A'. DO NOT estimate any values. However, if the value can be derived from available data, calculate it and display it with '(calculated)' next to it.\n"
+                            "1) If a value is missing or unclear, return 'N/A'. DO NOT estimate any values.\n"
                             "2) Convert values to the specified units where applicable.\n"
-                            "3) Extract and return data in this format:\n"
-                            "4) Ensure the strict format as shown:\n"
+                            "3) Determine whether the cylinder is SINGLE-ACTION or DOUBLE-ACTION and set it under CYLINDER ACTION.\n"
+                            "4) Extract and return data in this format:\n"
                             "CYLINDER ACTION: [value]\n"
                             "BORE DIAMETER: [value] MM\n"
-                            "OUTSIDE DIAMETER: [value] MM\n"
                             "ROD DIAMETER: [value] MM\n"
                             "STROKE LENGTH: [value] MM\n"
                             "CLOSE LENGTH: [value] MM\n"
-                            "OPEN LENGTH: [value] MM\n"
+                            "OPEN LENGTH: \n"
                             "OPERATING PRESSURE: [value] BAR\n"
                             "OPERATING TEMPERATURE: [value] DEG C\n"
-                            "MOUNTING: [value]\n"
-                            "ROD END: [value]\n"
-                            "FLUID: [value]"
+                            "OUTSIDE DIAMETER: \n"
+                            "MOUNTING: \n"
+                            "ROD END: \n"
+                            "FLUID: [Determine and Extract] \n"
+                            "DRAWING NUMBER: [Extract from Image]"
                         )
                     },
                     {
@@ -98,27 +98,28 @@ def analyze_cylinder_image(image_bytes):
 def main():
     # Set page config
     st.set_page_config(
-        page_title="JSW Engineering Drawing DataSheet Extractor",
+        page_title="JSW Engineering Drawing DataSheet Extractor",
         layout="wide"
     )
 
     # Title
-    st.title("JSW Engineering Drawing DataSheet Extractor")
+    st.title("JSW Engineering Drawing DataSheet Extractor")
 
     # Define expected parameters
     parameters = [
         "CYLINDER ACTION",
         "BORE DIAMETER",
-        "OUTSIDE DIAMETER",
         "ROD DIAMETER",
         "STROKE LENGTH",
         "CLOSE LENGTH",
-        "OPEN LENGTH",
+        "OPEN LENGTH",  # Kept blank by default
         "OPERATING PRESSURE",
         "OPERATING TEMPERATURE",
-        "MOUNTING",
-        "ROD END",
-        "FLUID"
+        "OUTSIDE DIAMETER",  # Kept blank by default
+        "MOUNTING",  # Kept blank by default
+        "ROD END",  # Kept blank by default
+        "FLUID",
+        "DRAWING NUMBER"  # New field added
     ]
 
     # File uploader and processing section
@@ -143,7 +144,7 @@ def main():
                     else:
                         parsed_results = parse_ai_response(result)
                         st.session_state.results_df = pd.DataFrame([
-                            {"Parameter": k, "Value": parsed_results.get(k, "N/A")}
+                            {"Parameter": k, "Value": parsed_results.get(k, "" if k in ["OPEN LENGTH", "OUTSIDE DIAMETER", "MOUNTING", "ROD END"] else "N/A")}
                             for k in parameters
                         ])
                         st.success("✅ Drawing processed successfully!")
