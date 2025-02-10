@@ -9,7 +9,13 @@ from dotenv import load_dotenv
 
 # Load API key
 load_dotenv()
-API_KEY = os.getenv("QWEN_API_KEY")
+
+API_KEY = os.getenv("API_KEY")
+
+if not API_KEY:
+    st.error("❌ API key not found! Check your .env file.")
+    st.stop()  # Stops execution if no API key is found.
+
 
 # OpenRouter API URL for Qwen2.5-VL-72B-Instruct
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -18,7 +24,7 @@ def encode_image_to_base64(image_bytes):
     return "data:image/jpeg;base64," + base64.b64encode(image_bytes).decode("utf-8")
 
 def parse_ai_response(response_text):
-    """Parse the AI response into a structured format. If a value is missing, return 'N/A' instead of estimating."""
+    """Parse the AI response into a structured format. If a value is missing, return 'N/A'."""
     results = {}
     lines = response_text.split('\n')
     for line in lines:
@@ -34,56 +40,60 @@ def parse_ai_response(response_text):
 def analyze_cylinder_image(image_bytes):
     base64_image = encode_image_to_base64(image_bytes)
     
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "text",
-                    "text": (
-                        "Analyze the engineering drawing and extract only the values that are clearly visible in the image.\n"
-                        "STRICT RULES:\n"
-                        "1)If a value is missing or unclear, return 'N/A'. DO NOT estimate any values. However, if the value can be derived from available data, calculate it and display it with '(calculated)' next to it."
-                        "2) Convert values to the specified units where applicable.\n"
-                        "3) Extract and return data in this format:\n"
-                        "4) Ensure the strict format as shown: \n"
-                        "CYLINDER ACTION: [value]\n"
-                        "BORE DIAMETER: [value] MM\n"
-                        "OUTSIDE DIAMETER: [value] MM\n"
-                        "ROD DIAMETER: [value] MM\n"
-                        "STROKE LENGTH: [value] MM\n"
-                        "CLOSE_LENGTH: [value] MM\n"
-                        "OPEN_LENGTH: [value] MM\n"
-                        "OPERATING PRESSURE: [value] BAR\n"
-                        "OPERATING TEMPERATURE: [value] DEG C\n"
-                        "MOUNTING: [value]\n"
-                        "ROD END: [value]\n"
-                        "FLUID: [value]"
-                    )
-                },
-                {
-                    "type": "image_url",
-                    "image_url": base64_image
-                }
-            ]
-        }
-    ]
-    
+    payload = {
+        "model": "qwen/qwen2.5-vl-72b-instruct:free",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "Analyze the engineering drawing and extract only the values that are clearly visible in the image.\n"
+                            "STRICT RULES:\n"
+                            "1) If a value is missing or unclear, return 'N/A'. DO NOT estimate any values. However, if the value can be derived from available data, calculate it and display it with '(calculated)' next to it.\n"
+                            "2) Convert values to the specified units where applicable.\n"
+                            "3) Extract and return data in this format:\n"
+                            "4) Ensure the strict format as shown:\n"
+                            "CYLINDER ACTION: [value]\n"
+                            "BORE DIAMETER: [value] MM\n"
+                            "OUTSIDE DIAMETER: [value] MM\n"
+                            "ROD DIAMETER: [value] MM\n"
+                            "STROKE LENGTH: [value] MM\n"
+                            "CLOSE LENGTH: [value] MM\n"
+                            "OPEN LENGTH: [value] MM\n"
+                            "OPERATING PRESSURE: [value] BAR\n"
+                            "OPERATING TEMPERATURE: [value] DEG C\n"
+                            "MOUNTING: [value]\n"
+                            "ROD END: [value]\n"
+                            "FLUID: [value]"
+                        )
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": base64_image
+                    }
+                ]
+            }
+        ]
+    }
+
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+
     try:
-        response = requests.post(
-            API_URL,
-            headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
-            json={"model": "qwen/qwen2.5-vl-72b-instruct:free", "messages": messages}
-        )
+        response = requests.post(API_URL, headers=headers, json=payload)
         response_json = response.json()
         
         if response.status_code == 200 and "choices" in response_json:
             return response_json["choices"][0]["message"]["content"]
         else:
-            return f"API Error: {response_json}"  # ❌ Fix: Returning error instead of st.error()
+            return f"❌ API Error: {response_json}"  # Returns error details
 
     except Exception as e:
-        return f"Processing Error: {str(e)}"  # ❌ Fix: Returning error instead of st.error()
+        return f"❌ Processing Error: {str(e)}"
 
 def main():
     # Set page config
@@ -128,7 +138,7 @@ def main():
                     
                     result = analyze_cylinder_image(image_bytes)
                     
-                    if "Error" in result:  # ❌ Fix: Handling errors correctly
+                    if "❌ API Error" in result or "❌ Processing Error" in result:
                         st.error(result)
                     else:
                         parsed_results = parse_ai_response(result)
@@ -136,7 +146,7 @@ def main():
                             {"Parameter": k, "Value": parsed_results.get(k, "N/A")}
                             for k in parameters
                         ])
-                        st.success("Drawing processed successfully!")
+                        st.success("✅ Drawing processed successfully!")
 
             if st.session_state.results_df is not None:
                 st.write("### Extracted Parameters")
