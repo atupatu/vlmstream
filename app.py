@@ -23,7 +23,7 @@ def encode_image_to_base64(image_bytes):
     return "data:image/jpeg;base64," + base64.b64encode(image_bytes).decode("utf-8")
 
 def parse_ai_response(response_text):
-    """Parse the AI response into a structured format. If a value is missing, return 'N/A'."""
+    """Parse the AI response into a structured format. If a value is missing, return an empty string."""
     results = {}
     lines = response_text.split('\n')
     for line in lines:
@@ -31,9 +31,7 @@ def parse_ai_response(response_text):
             key, value = line.split(':', 1)
             key = key.strip().upper()
             value = value.strip()
-            if not value:  # Strictly no estimation
-                value = "N/A"
-            results[key] = value
+            results[key] = value if value else ""  # Keep blank if missing
     return results
 
 def analyze_cylinder_image(image_bytes):
@@ -50,19 +48,19 @@ def analyze_cylinder_image(image_bytes):
                         "text": (
                             "Analyze the engineering drawing and extract only the values that are clearly visible in the image.\n"
                             "STRICT RULES:\n"
-                            "1) If a value is missing or unclear, return 'N/A'. DO NOT estimate any values.\n"
+                            "1) If a value is missing or unclear, return an empty string. DO NOT estimate any values.\n"
                             "2) Convert values to the specified units where applicable.\n"
                             "3) Determine whether the cylinder is SINGLE-ACTION or DOUBLE-ACTION and set it under CYLINDER ACTION.\n"
                             "4) Extract and return data in this format:\n"
                             "CYLINDER ACTION: [value]\n"
                             "BORE DIAMETER: [value] MM\n"
+                            "OUTSIDE DIAMETER: \n"
                             "ROD DIAMETER: [value] MM\n"
                             "STROKE LENGTH: [value] MM\n"
                             "CLOSE LENGTH: [value] MM\n"
                             "OPEN LENGTH: \n"
                             "OPERATING PRESSURE: [value] BAR\n"
                             "OPERATING TEMPERATURE: [value] DEG C\n"
-                            "OUTSIDE DIAMETER: \n"
                             "MOUNTING: \n"
                             "ROD END: \n"
                             "FLUID: [Determine and Extract] \n"
@@ -105,17 +103,17 @@ def main():
     # Title
     st.title("JSW Engineering Drawing DataSheet Extractor")
 
-    # Define expected parameters
+    # Define expected parameters in the new order
     parameters = [
         "CYLINDER ACTION",
         "BORE DIAMETER",
+        "OUTSIDE DIAMETER",  # Moved below BORE DIAMETER
         "ROD DIAMETER",
         "STROKE LENGTH",
         "CLOSE LENGTH",
         "OPEN LENGTH",  # Kept blank by default
         "OPERATING PRESSURE",
         "OPERATING TEMPERATURE",
-        "OUTSIDE DIAMETER",  # Kept blank by default
         "MOUNTING",  # Kept blank by default
         "ROD END",  # Kept blank by default
         "FLUID",
@@ -144,7 +142,7 @@ def main():
                     else:
                         parsed_results = parse_ai_response(result)
                         st.session_state.results_df = pd.DataFrame([
-                            {"Parameter": k, "Value": parsed_results.get(k, "" if k in ["OPEN LENGTH", "OUTSIDE DIAMETER", "MOUNTING", "ROD END"] else "N/A")}
+                            {"Parameter": k, "Value": parsed_results.get(k, "")}  # Blank if missing
                             for k in parameters
                         ])
                         st.success("✅ Drawing processed successfully!")
