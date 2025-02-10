@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 # Load API key
 load_dotenv()
-API_KEY = os.getenv("QWEN_API_KEY", "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")
+API_KEY = os.getenv("QWEN_API_KEY")
 
 # OpenRouter API URL for Qwen2.5-VL-72B-Instruct
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
