@@ -98,12 +98,12 @@ def analyze_cylinder_image(image_bytes):
 def main():
     # Set page config
     st.set_page_config(
-        page_title="Technical Drawing DataSheet Extraction",
+        page_title="JSW Engineering Drawing DataSheet Extractor",
         layout="wide"
     )
 
     # Title
-    st.title("Technical Drawing DataSheet Extraction")
+    st.title("JSW Engineering Drawing DataSheet Extractor")
 
     # Define expected parameters
     parameters = [
