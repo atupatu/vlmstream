@@ -4,26 +4,21 @@ from PIL import Image
 import io
 import pandas as pd
 import os
-import subprocess
-import sys
-
-
-# Check and install mistralai if not installed
-try:
-    from mistralai import Mistral
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "mistralai"])
-    from mistralai import Mistral  # Import again after installation
-
+import requests
 from dotenv import load_dotenv
 
+# Load API key
 load_dotenv()
+API_KEY = os.getenv("QWEN_API_KEY", "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")
+
+# OpenRouter API URL for Qwen2.5-VL-72B-Instruct
+API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 def encode_image_to_base64(image_bytes):
     return "data:image/jpeg;base64," + base64.b64encode(image_bytes).decode("utf-8")
 
 def parse_ai_response(response_text):
-    """Parse the AI response into a structured format"""
+    """Parse the AI response into a structured format. If a value is missing, return 'N/A' instead of estimating."""
     results = {}
     lines = response_text.split('\n')
     for line in lines:
@@ -31,14 +26,12 @@ def parse_ai_response(response_text):
             key, value = line.split(':', 1)
             key = key.strip().upper()
             value = value.strip()
-            value = value.split(' ')[0] if ' ' in value else value
+            if not value:  # Strictly no estimation
+                value = "N/A"
             results[key] = value
     return results
 
 def analyze_cylinder_image(image_bytes):
-    api_key = os.getenv("MISTRAL_API_KEY")
-    model = "pixtral-12b-2409"
-    client = Mistral(api_key=api_key)
     base64_image = encode_image_to_base64(image_bytes)
     
     messages = [
@@ -48,14 +41,19 @@ def analyze_cylinder_image(image_bytes):
                 {
                     "type": "text",
                     "text": (
-                        "Analyze the engineering drawing and provide the following information with these strict rules 1)in exactly this format, 2)only extract these fields from the upload image rest keep empty in the table(if empty then return NA):3)if the metrics dont match ,convert them into the desired metrics 4)Try your best to get all the values ,as this is a steel pipe image\n"
+                        "Analyze the engineering drawing and extract only the values that are clearly visible in the image.\n"
+                        "STRICT RULES:\n"
+                        "1)If a value is missing or unclear, return 'N/A'. DO NOT estimate any values. However, if the value can be derived from available data, calculate it and display it with '(calculated)' next to it."
+                        "2) Convert values to the specified units where applicable.\n"
+                        "3) Extract and return data in this format:\n"
+                        "4) Ensure the strict format as shown: \n"
                         "CYLINDER ACTION: [value]\n"
                         "BORE DIAMETER: [value] MM\n"
                         "OUTSIDE DIAMETER: [value] MM\n"
                         "ROD DIAMETER: [value] MM\n"
                         "STROKE LENGTH: [value] MM\n"
-                        "CLOSE LENGTH: [value] MM\n"
-                        "OPEN LENGTH: [value] MM\n"
+                        "CLOSE_LENGTH: [value] MM\n"
+                        "OPEN_LENGTH: [value] MM\n"
                         "OPERATING PRESSURE: [value] BAR\n"
                         "OPERATING TEMPERATURE: [value] DEG C\n"
                         "MOUNTING: [value]\n"
@@ -72,14 +70,20 @@ def analyze_cylinder_image(image_bytes):
     ]
     
     try:
-        chat_response = client.chat.complete(
-            model=model,
-            messages=messages
+        response = requests.post(
+            API_URL,
+            headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
+            json={"model": "qwen/qwen2.5-vl-72b-instruct:free", "messages": messages}
         )
-        return chat_response.choices[0].message.content
+        response_json = response.json()
+        
+        if response.status_code == 200 and "choices" in response_json:
+            return response_json["choices"][0]["message"]["content"]
+        else:
+            return f"API Error: {response_json}"  # ❌ Fix: Returning error instead of st.error()
+
     except Exception as e:
-        st.error(f"Error during processing: {str(e)}")
-        return None
+        return f"Processing Error: {str(e)}"  # ❌ Fix: Returning error instead of st.error()
 
 def main():
     # Set page config
@@ -88,80 +92,56 @@ def main():
         layout="wide"
     )
 
-    # Custom CSS
-    st.markdown("""
-        <style>
-        .stButton>button {
-            border-radius: 20px;
-            padding: 10px 24px;
-            background-color: #0083B8;
-            color: white;
-            border: none;
-        }
-        .stButton>button:hover {
-            background-color: #0073A8;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
     # Title
     st.title("Technical Drawing DataSheet Extraction")
 
-    # Define parameters and units
-    parameters = {
-        "CYLINDER ACTION": "N/A",
-        "BORE DIAMETER": "MM",
-        "OUTSIDE DIAMETER": "N/A",
-        "ROD DIAMETER": "MM",
-        "STROKE LENGTH": "MM",
-        "CLOSE LENGTH": "MM",
-        "OPEN LENGTH": "N/A",
-        "OPERATING PRESSURE": "BAR",
-        "OPERATING TEMPERATURE": "DEG C",
-        "MOUNTING": "N/A",
-        "ROD END": "N/A",
-        "FLUID": "N/A"
-    }
+    # Define expected parameters
+    parameters = [
+        "CYLINDER ACTION",
+        "BORE DIAMETER",
+        "OUTSIDE DIAMETER",
+        "ROD DIAMETER",
+        "STROKE LENGTH",
+        "CLOSE LENGTH",
+        "OPEN LENGTH",
+        "OPERATING PRESSURE",
+        "OPERATING TEMPERATURE",
+        "MOUNTING",
+        "ROD END",
+        "FLUID"
+    ]
 
     # File uploader and processing section
     uploaded_file = st.file_uploader("Select File", type=['png', 'jpg', 'jpeg'])
 
     if uploaded_file is not None:
-        # Create two columns
         col1, col2 = st.columns([3, 2])
         
         with col1:
             if 'results_df' not in st.session_state:
                 st.session_state.results_df = None
 
-            # Process button
             if st.button("Process Drawing", key="process_button"):
                 with st.spinner('Processing drawing...'):
-                    # Get image bytes for processing
                     uploaded_file.seek(0)
                     image_bytes = uploaded_file.read()
                     
-                    # Process the image
                     result = analyze_cylinder_image(image_bytes)
                     
-                    if result:
-                        # Parse the AI response
+                    if "Error" in result:  # ❌ Fix: Handling errors correctly
+                        st.error(result)
+                    else:
                         parsed_results = parse_ai_response(result)
-                        
-                        # Create DataFrame for display
                         st.session_state.results_df = pd.DataFrame([
-                            {"Parameter": k, "Value": v, "UOM": parameters[k]}
-                            for k, v in parsed_results.items()
-                            if k in parameters
+                            {"Parameter": k, "Value": parsed_results.get(k, "N/A")}
+                            for k in parameters
                         ])
                         st.success("Drawing processed successfully!")
 
-            # Display the table if results exist
             if st.session_state.results_df is not None:
                 st.write("### Extracted Parameters")
                 st.table(st.session_state.results_df)
             
-                # Export button
                 csv = st.session_state.results_df.to_csv(index=False)
                 st.download_button(
                     label="Download CSV",
@@ -171,7 +151,6 @@ def main():
                 )
 
         with col2:
-            # Display the uploaded image
             image = Image.open(uploaded_file)
             st.image(image, caption="Uploaded Technical Drawing")
 
